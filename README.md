@@ -108,6 +108,7 @@ Team-6-Project_Building/
 - `GET /api/department_status` - Department-wise queue data (JSON)
 - `GET /api/hospital_overview` - Hospital-wide metrics (JSON)
 - `GET /api/patient_status/<patient_id>` - Individual patient status (JSON)
+- `GET /api/waiting_patients` - List of all waiting patients (JSON)
 - `POST /api/leave_queue` - Patient leaves/cancels queue registration (JSON)
 - `POST /api/mark_served` - Mark patient as served (JSON)
 
@@ -178,6 +179,23 @@ curl -X POST http://localhost:5000/api/leave_queue \
   -H "Content-Type: application/json" \
   -d '{"patient_id": 1}'
 ```
+
+### Auto-Timeout (No-Show Management)
+
+Patients are automatically removed from the queue if they don't show up within their estimated waiting time plus a grace period.
+
+**Configuration**:
+- Grace Period: 5 minutes (configurable in `app.py` as `TIMEOUT_GRACE_PERIOD`)
+- Calculation: `Registration Time + Estimated Wait Time + Grace Period`
+- Status: Timed-out patients are marked as `'timeout'`
+
+**Example**:
+- Patient registers at 14:00
+- Estimated wait time: 15 minutes
+- Grace period: 5 minutes
+- Auto-removal time: 14:20 (14:00 + 15 + 5)
+
+The timeout check runs automatically on every dashboard and API refresh.
 
 ## Mobile Optimization
 

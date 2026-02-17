@@ -51,6 +51,18 @@
         </div>
     </div>
 
+    <!-- Waiting Patients List -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Waiting Patients</h2>
+            <p class="card-subtitle">All patients currently in queue</p>
+        </div>
+
+        <div id="patientsList">
+            <!-- Patient list will be inserted here by JavaScript -->
+        </div>
+    </div>
+
     <div class="card">
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
             <p style="color: #6b7280; font-size: 0.875rem; margin: 0;">
@@ -129,6 +141,104 @@
 
                 departmentGrid.appendChild(card);
             });
+
+            // Fetch and display waiting patients
+            const patientsResponse = await fetch('/api/waiting_patients');
+            const patientsData = await patientsResponse.json();
+
+            const patientsList = document.getElementById('patientsList');
+
+            if (patientsData.length === 0) {
+                patientsList.innerHTML = `
+                    <div style="text-align: center; padding: 2rem; color: #6b7280;">
+                        <p style="font-size: 1.125rem;">No patients currently waiting</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">Queue is empty</p>
+                    </div>
+                `;
+            } else {
+                patientsList.innerHTML = `
+                    <div class="table-container">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Department</th>
+                                    <th>Queue #</th>
+                                    <th>Position</th>
+                                    <th>Wait Time</th>
+                                    <th>Registered</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="patientsTableBody">
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+
+                const tbody = document.getElementById('patientsTableBody');
+                patientsData.forEach(patient => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td><strong>${patient.name}</strong></td>
+                        <td>${patient.department}</td>
+                        <td><span class="badge badge-primary">${patient.queue_number}</span></td>
+                        <td>${patient.position}</td>
+                        <td>${patient.waiting_time} min</td>
+                        <td>${patient.timestamp}</td>
+                        <td>
+                            <button class="btn btn-secondary leave-btn" 
+                                data-patient-id="${patient.id}" 
+                                data-patient-name="${patient.name}"
+                                style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); 
+                                       padding: 0.5rem 1rem; 
+                                       font-size: 0.875rem;
+                                       min-height: 36px;
+                                       width: auto;">
+                                🚪 Leave
+                            </button>
+                        </td>
+                    `;
+                    tbody.appendChild(row);
+                });
+
+                // Add event listeners to all leave buttons
+                document.querySelectorAll('.leave-btn').forEach(btn => {
+                    btn.addEventListener('click', async (e) => {
+                        const patientId = e.target.dataset.patientId;
+                        const patientName = e.target.dataset.patientName;
+
+                        if (confirm(`Remove ${patientName} from the queue?`)) {
+                            e.target.textContent = 'Leaving...';
+                            e.target.disabled = true;
+
+                            try {
+                                const response = await fetch('/api/leave_queue', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ patient_id: parseInt(patientId) })
+                                });
+
+                                const data = await response.json();
+
+                                if (data.success) {
+                                    // Refresh dashboard immediately
+                                    updateDashboard();
+                                } else {
+                                    alert('Error: ' + (data.error || 'Failed to remove patient'));
+                                    e.target.textContent = '🚪 Leave';
+                                    e.target.disabled = false;
+                                }
+                            } catch (error) {
+                                alert('Failed to remove patient. Please try again.');
+                                console.error('Error:', error);
+                                e.target.textContent = '🚪 Leave';
+                                e.target.disabled = false;
+                            }
+                        }
+                    });
+                });
+            }
 
             // Update timestamp
             const now = new Date();

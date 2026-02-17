@@ -9,6 +9,10 @@ app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///hospital_queue.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
+# Timeout Configuration
+# Grace period after estimated waiting time before auto-removal (in minutes)
+TIMEOUT_GRACE_PERIOD = 1
+
 db = SQLAlchemy(app)
 
 # Database Models
@@ -46,7 +50,7 @@ def init_db():
             departments = [
                 Department(name='Doctor Consultation', average_service_time=15, 
                           description='General physician consultation'),
-                Department(name='Pharmacy / Medicine Pickup', average_service_time=5,
+                Department(name='Pharmacy / Medicine Pickup', average_service_time=1,
                           description='Collect prescribed medicines'),
                 Department(name='Blood Test / Laboratory', average_service_time=10,
                           description='Blood tests and lab work'),
@@ -115,6 +119,40 @@ def get_hospital_crowd_level(total_count):
         return {'level': 'Moderate', 'color': 'warning'}
     else:
         return {'level': 'High', 'color': 'danger'}
+
+def check_and_remove_timeout_patients():
+    """
+    Check for patients who have exceeded their waiting time + grace period
+    and automatically mark them as 'timeout' (no-show)
+    """
+    from datetime import datetime, timedelta
+    
+    waiting_patients = Patient.query.filter_by(status='waiting').all()
+    timeout_count = 0
+    
+    for patient in waiting_patients:
+        # Get patient's position and estimated waiting time
+        position = get_queue_position(patient.id)
+        if not position:
+            continue
+            
+        estimated_wait_minutes = calculate_waiting_time(patient.department, position)
+        
+        # Calculate total allowed time: registration time + estimated wait + grace period
+        registration_time = patient.timestamp
+        total_allowed_time = registration_time + timedelta(minutes=estimated_wait_minutes + TIMEOUT_GRACE_PERIOD)
+        
+        # Check if current time exceeds allowed time
+        current_time = datetime.utcnow()
+        if current_time > total_allowed_time:
+            # Patient has timed out - mark as timeout
+            patient.status = 'timeout'
+            timeout_count += 1
+    
+    if timeout_count > 0:
+        db.session.commit()
+    
+    return timeout_count
 
 # Routes
 @app.route('/')
@@ -209,6 +247,9 @@ def dashboard():
 @app.route('/api/department_status')
 def department_status():
     """API endpoint for department-wise queue data"""
+    # Check and remove timed-out patients
+    check_and_remove_timeout_patients()
+    
     departments = Department.query.all()
     dept_data = []
     
@@ -239,6 +280,9 @@ def department_status():
 @app.route('/api/hospital_overview')
 def hospital_overview():
     """API endpoint for hospital-wide metrics"""
+    # Check and remove timed-out patients
+    check_and_remove_timeout_patients()
+    
     total_waiting = Patient.query.filter_by(status='waiting').count()
     total_served = Patient.query.filter_by(status='served').count()
     
@@ -282,6 +326,31 @@ def patient_status_api(patient_id):
         'crowd_level': crowd_level['level'],
         'crowd_color': crowd_level['color']
     })
+
+@app.route('/api/waiting_patients')
+def waiting_patients():
+    """API endpoint to get list of all waiting patients"""
+    # Check and remove timed-out patients
+    check_and_remove_timeout_patients()
+    
+    patients = Patient.query.filter_by(status='waiting').order_by(Patient.timestamp).all()
+    
+    patient_list = []
+    for patient in patients:
+        position = get_queue_position(patient.id)
+        waiting_time = calculate_waiting_time(patient.department, position) if position else 0
+        
+        patient_list.append({
+            'id': patient.id,
+            'name': patient.name,
+            'department': patient.department,
+            'queue_number': patient.queue_number,
+            'position': position,
+            'waiting_time': waiting_time,
+            'timestamp': patient.timestamp.strftime('%H:%M')
+        })
+    
+    return jsonify(patient_list)
 
 @app.route('/api/leave_queue', methods=['POST'])
 def leave_queue():

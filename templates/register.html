@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+
+{% block title %}Register - Smart Queue System{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <div class="card">
+        <div class="card-header">
+            <h1 class="card-title">Queue Registration</h1>
+            <p class="card-subtitle">Please fill in your details to join the queue</p>
+        </div>
+
+        <form id="registrationForm">
+            <div class="form-group">
+                <label for="name" class="form-label">Patient Name / ID *</label>
+                <input type="text" id="name" name="name" class="form-input" placeholder="Enter your name or patient ID"
+                    required autocomplete="name">
+            </div>
+
+            <div class="form-group">
+                <label for="department" class="form-label">Select Department *</label>
+                <select id="department" name="department" class="form-select" required>
+                    <option value="">-- Choose a department --</option>
+                    {% for dept in departments %}
+                    <option value="{{ dept.name }}">{{ dept.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="submitBtn">
+                Register Now
+            </button>
+
+            <a href="{{ url_for('landing') }}" class="btn btn-secondary" style="margin-top: 1rem;">
+                ← Back to Home
+            </a>
+        </form>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div id="successModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-icon success">✓</div>
+            <h2 class="modal-title">Registration Successful!</h2>
+        </div>
+
+        <div class="status-box">
+            <div class="status-item">
+                <span class="status-label">Queue Number</span>
+                <span class="status-value" id="modalQueueNumber">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Position in Queue</span>
+                <span class="status-value" id="modalPosition">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Estimated Wait Time</span>
+                <span class="status-value" id="modalWaitTime">-</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Department Status</span>
+                <span id="modalCrowdLevel">-</span>
+            </div>
+        </div>
+
+        <p style="text-align: center; color: #6b7280; margin-bottom: 1rem; font-size: 0.95rem;">
+            Redirecting to your status page in <span id="countdown">5</span> seconds...
+        </p>
+
+        <button class="btn btn-success" id="viewStatusBtn">
+            View My Status
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.getElementById('registrationForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitBtn = document.getElementById('submitBtn');
+        const originalText = submitBtn.textContent;
+        submitBtn.textContent = 'Registering...';
+        submitBtn.disabled = true;
+
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('{{ url_for("register") }}', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Populate modal with data
+                document.getElementById('modalQueueNumber').textContent = data.queue_number;
+                document.getElementById('modalPosition').textContent = data.position;
+                document.getElementById('modalWaitTime').textContent = data.waiting_time + ' min';
+
+                const crowdBadge = `<span class="badge badge-${data.crowd_level.color}">${data.crowd_level.level}</span>`;
+                document.getElementById('modalCrowdLevel').innerHTML = crowdBadge;
+
+                // Show modal
+                document.getElementById('successModal').classList.add('active');
+
+                // Countdown and redirect
+                let seconds = 5;
+                const countdownEl = document.getElementById('countdown');
+                const interval = setInterval(() => {
+                    seconds--;
+                    countdownEl.textContent = seconds;
+                    if (seconds <= 0) {
+                        clearInterval(interval);
+                        window.location.href = `/status/${data.patient_id}`;
+                    }
+                }, 1000);
+
+                // Manual redirect button
+                document.getElementById('viewStatusBtn').onclick = () => {
+                    clearInterval(interval);
+                    window.location.href = `/status/${data.patient_id}`;
+                };
+            } else {
+                alert('Registration failed: ' + (data.error || 'Unknown error'));
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            }
+        } catch (error) {
+            alert('Registration failed. Please try again.');
+            console.error('Error:', error);
+            submitBtn.textContent = originalText;
+            submitBtn.disabled = false;
+        }
+    });
+</script>
+{% endblock %}

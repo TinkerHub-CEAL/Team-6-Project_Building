@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome - Smart Queue System{% endblock %}
+
+{% block content %}
+<div class="hero">
+    <h1 class="hero-title">🏥 Smart Queue System</h1>
+    <p class="hero-subtitle">
+        Welcome to our hospital's digital queue management system.
+        Register quickly and monitor your waiting time in real-time.
+    </p>
+</div>
+
+<div class="container">
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Get Started</h2>
+            <p class="card-subtitle">Choose an option below to continue</p>
+        </div>
+
+        <div class="grid">
+            <div>
+                <a href="{{ url_for('register') }}" class="btn btn-primary">
+                    📝 Register for Queue
+                </a>
+                <p style="text-align: center; margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+                    Join the queue for your department
+                </p>
+            </div>
+
+            <div>
+                <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                    📊 View Live Dashboard
+                </a>
+                <p style="text-align: center; margin-top: 0.5rem; color: #6b7280; font-size: 0.875rem;">
+                    Monitor hospital crowd levels
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3 style="font-size: 1.25rem; font-weight: 700; margin-bottom: 1rem; color: #1f2937;">
+            Available Departments
+        </h3>
+        <div style="display: grid; gap: 0.75rem;">
+            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 3px solid #2563eb;">
+                <strong style="color: #1f2937;">👨‍⚕️ Doctor Consultation</strong>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">General physician consultation</p>
+            </div>
+            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 3px solid #10b981;">
+                <strong style="color: #1f2937;">💊 Pharmacy / Medicine Pickup</strong>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Collect prescribed medicines</p>
+            </div>
+            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 3px solid #f59e0b;">
+                <strong style="color: #1f2937;">🩸 Blood Test / Laboratory</strong>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Blood tests and lab work</p>
+            </div>
+            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 3px solid #8b5cf6;">
+                <strong style="color: #1f2937;">🔬 Radiology / Scanning</strong>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">X-ray, MRI, CT scans</p>
+            </div>
+            <div style="padding: 0.75rem; background: #f9fafb; border-radius: 0.5rem; border-left: 3px solid #ec4899;">
+                <strong style="color: #1f2937;">📄 Medical Report Collection</strong>
+                <p style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">Collect test reports and documents
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

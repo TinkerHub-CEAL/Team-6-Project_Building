@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+
+{% block title %}Queue Status - Smart Queue System{% endblock %}
+
+{% block content %}
+<div class="container" style="margin-top: 2rem;">
+    <div class="card">
+        <div class="card-header">
+            <h1 class="card-title">Your Queue Status</h1>
+            <p class="card-subtitle">{{ patient.name }} - {{ patient.department }}</p>
+        </div>
+
+        <div class="status-box"
+            style="border-left-color: {% if patient.status == 'served' %}#10b981{% else %}#2563eb{% endif %};">
+            <div class="status-item">
+                <span class="status-label">Queue Number</span>
+                <span class="status-value" id="queueNumber">{{ patient.queue_number }}</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Current Position</span>
+                <span class="status-value" id="currentPosition">
+                    {% if patient.status == 'served' %}
+                    <span style="color: #10b981;">Served ✓</span>
+                    {% else %}
+                    {{ position }}
+                    {% endif %}
+                </span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Estimated Wait Time</span>
+                <span class="status-value" id="waitTime">
+                    {% if patient.status == 'served' %}
+                    <span style="color: #10b981;">0 min</span>
+                    {% else %}
+                    {{ waiting_time }} min
+                    {% endif %}
+                </span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Department Status</span>
+                <span id="crowdLevel">
+                    <span class="badge badge-{{ crowd_level.color }}">{{ crowd_level.level }}</span>
+                </span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Status</span>
+                <span id="patientStatus">
+                    {% if patient.status == 'waiting' %}
+                    <span class="badge badge-warning">Waiting</span>
+                    {% else %}
+                    <span class="badge badge-success">Served</span>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+
+        {% if patient.status == 'waiting' %}
+        <div class="alert alert-success">
+            <strong>💡 Tip:</strong> Your position updates automatically every 10 seconds.
+            Please stay nearby when your turn approaches.
+        </div>
+        {% else %}
+        <div class="alert alert-success">
+            <strong>✓ Complete:</strong> You have been served. Thank you for using our queue system!
+        </div>
+        {% endif %}
+
+        <div style="display: grid; gap: 1rem; margin-top: 1.5rem;">
+            {% if patient.status == 'waiting' %}
+            <button id="leaveQueueBtn" class="btn btn-secondary"
+                style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                🚪 Leave Queue
+            </button>
+            {% endif %}
+            <a href="{{ url_for('dashboard') }}" class="btn btn-secondary">
+                📊 View Live Dashboard
+            </a>
+            <a href="{{ url_for('landing') }}" class="btn btn-secondary">
+                ← Back to Home
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <p style="text-align: center; color: #6b7280; font-size: 0.875rem;">
+            <strong>Last Updated:</strong> <span id="lastUpdate">Just now</span>
+        </p>
+    </div>
+</div>
+
+<!-- Leave Queue Confirmation Modal -->
+<div id="leaveQueueModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <div class="modal-icon" style="color: #f59e0b;">⚠️</div>
+            <h2 class="modal-title">Leave Queue?</h2>
+        </div>
+
+        <p style="text-align: center; color: #6b7280; margin-bottom: 1.5rem;">
+            Are you sure you want to leave the queue? You will lose your current position.
+        </p>
+
+        <div style="display: grid; gap: 1rem;">
+            <button id="confirmLeaveBtn" class="btn btn-primary"
+                style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                Yes, Leave Queue
+            </button>
+            <button id="cancelLeaveBtn" class="btn btn-secondary">
+                Cancel
+            </button>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <p style="text-align: center; color: #6b7280; font-size: 0.875rem;">
+        <strong>Last Updated:</strong> <span id="lastUpdate">Just now</span>
+    </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const patientId = {{ patient.id }};
+    let updateInterval;
+
+    async function updateStatus() {
+        try {
+            const response = await fetch(`/api/patient_status/${patientId}`);
+            const data = await response.json();
+
+            // Update position
+            if (data.status === 'served') {
+                document.getElementById('currentPosition').innerHTML = '<span style="color: #10b981;">Served ✓</span>';
+                document.getElementById('waitTime').innerHTML = '<span style="color: #10b981;">0 min</span>';
+                document.getElementById('patientStatus').innerHTML = '<span class="badge badge-success">Served</span>';
+
+                // Stop auto-refresh when served
+                clearInterval(updateInterval);
+            } else if (data.status === 'cancelled') {
+                // Patient left the queue
+                window.location.reload();
+            } else {
+                document.getElementById('currentPosition').textContent = data.position;
+                document.getElementById('waitTime').textContent = data.waiting_time + ' min';
+            }
+
+            // Update crowd level
+            document.getElementById('crowdLevel').innerHTML =
+                `<span class="badge badge-${data.crowd_color}">${data.crowd_level}</span>`;
+
+            // Update timestamp
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+
+        } catch (error) {
+            console.error('Error updating status:', error);
+        }
+    }
+
+    // Leave Queue functionality
+    {% if patient.status == 'waiting' %}
+    const leaveQueueBtn = document.getElementById('leaveQueueBtn');
+    const leaveQueueModal = document.getElementById('leaveQueueModal');
+    const confirmLeaveBtn = document.getElementById('confirmLeaveBtn');
+    const cancelLeaveBtn = document.getElementById('cancelLeaveBtn');
+
+    leaveQueueBtn.addEventListener('click', () => {
+        leaveQueueModal.classList.add('active');
+    });
+
+    cancelLeaveBtn.addEventListener('click', () => {
+        leaveQueueModal.classList.remove('active');
+    });
+
+    confirmLeaveBtn.addEventListener('click', async () => {
+        confirmLeaveBtn.textContent = 'Leaving...';
+        confirmLeaveBtn.disabled = true;
+
+        try {
+            const response = await fetch('/api/leave_queue', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ patient_id: patientId })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Show success message and redirect
+                alert('You have successfully left the queue.');
+                window.location.href = '{{ url_for("landing") }}';
+            } else {
+                alert('Error: ' + (data.error || 'Failed to leave queue'));
+                confirmLeaveBtn.textContent = 'Yes, Leave Queue';
+                confirmLeaveBtn.disabled = false;
+            }
+        } catch (error) {
+            alert('Failed to leave queue. Please try again.');
+            console.error('Error:', error);
+            confirmLeaveBtn.textContent = 'Yes, Leave Queue';
+            confirmLeaveBtn.disabled = false;
+        }
+    });
+
+    // Close modal on outside click
+    leaveQueueModal.addEventListener('click', (e) => {
+        if (e.target === leaveQueueModal) {
+            leaveQueueModal.classList.remove('active');
+        }
+    });
+    {% endif %}
+
+    // Auto-refresh every 10 seconds
+    {% if patient.status == 'waiting' %}
+    updateInterval = setInterval(updateStatus, 10000);
+    {% endif %}
+</script>
+{% endblock %}

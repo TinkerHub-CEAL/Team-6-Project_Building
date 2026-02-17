@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Live Dashboard - Smart Queue System{% endblock %}
+
+{% block content %}
+<div class="hero" style="padding: 2rem 1rem;">
+    <h1 class="hero-title" style="font-size: 2rem;">📊 Live Hospital Dashboard</h1>
+    <p class="hero-subtitle" style="font-size: 1rem;">
+        Real-time queue monitoring and crowd level tracking
+    </p>
+</div>
+
+<div class="container">
+    <!-- Hospital Overview Stats -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" id="totalWaiting">-</div>
+            <div class="stat-label">Patients Waiting</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalServed">-</div>
+            <div class="stat-label">Patients Served</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" id="totalPatients">-</div>
+            <div class="stat-label">Total Today</div>
+        </div>
+    </div>
+
+    <!-- Overall Hospital Crowd Level -->
+    <div class="card">
+        <div style="text-align: center;">
+            <h2 style="font-size: 1.5rem; font-weight: 700; margin-bottom: 1rem; color: #1f2937;">
+                Overall Hospital Status
+            </h2>
+            <div id="hospitalCrowdLevel" style="font-size: 1.25rem;">
+                <span class="badge badge-success">Loading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Department-wise Queue Tables -->
+    <div class="card">
+        <div class="card-header">
+            <h2 class="card-title">Department-wise Queue Status</h2>
+            <p class="card-subtitle">Live updates every 5 seconds</p>
+        </div>
+
+        <div id="departmentGrid" class="grid">
+            <!-- Department cards will be inserted here by JavaScript -->
+        </div>
+    </div>
+
+    <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <p style="color: #6b7280; font-size: 0.875rem; margin: 0;">
+                <strong>Last Updated:</strong> <span id="lastUpdate">Just now</span>
+            </p>
+            <a href="{{ url_for('landing') }}" class="btn btn-secondary" style="width: auto; min-width: 150px;">
+                ← Back to Home
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function updateDashboard() {
+        try {
+            // Fetch hospital overview
+            const overviewResponse = await fetch('/api/hospital_overview');
+            const overviewData = await overviewResponse.json();
+
+            document.getElementById('totalWaiting').textContent = overviewData.total_waiting;
+            document.getElementById('totalServed').textContent = overviewData.total_served;
+            document.getElementById('totalPatients').textContent = overviewData.total_patients;
+
+            document.getElementById('hospitalCrowdLevel').innerHTML =
+                `<span class="badge badge-${overviewData.crowd_color}" style="font-size: 1.25rem; padding: 0.75rem 1.5rem;">
+                ${overviewData.crowd_level} Crowd Level
+            </span>`;
+
+            // Fetch department status
+            const deptResponse = await fetch('/api/department_status');
+            const deptData = await deptResponse.json();
+
+            // Build department cards
+            const departmentGrid = document.getElementById('departmentGrid');
+            departmentGrid.innerHTML = '';
+
+            deptData.forEach(dept => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.style.margin = '0';
+
+                // Department icon mapping
+                const icons = {
+                    'Doctor Consultation': '👨‍⚕️',
+                    'Pharmacy / Medicine Pickup': '💊',
+                    'Blood Test / Laboratory': '🩸',
+                    'Radiology / Scanning (X-ray, MRI, CT)': '🔬',
+                    'Medical Report Collection': '📄'
+                };
+
+                card.innerHTML = `
+                <div style="margin-bottom: 1rem;">
+                    <h3 style="font-size: 1.125rem; font-weight: 700; color: #1f2937; margin-bottom: 0.5rem;">
+                        ${icons[dept.name] || '🏥'} ${dept.name}
+                    </h3>
+                    <span class="badge badge-${dept.crowd_color}">${dept.crowd_level}</span>
+                </div>
+                
+                <div style="display: grid; gap: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #f9fafb; border-radius: 0.5rem;">
+                        <span style="color: #6b7280; font-size: 0.875rem;">Queue Count</span>
+                        <strong style="color: #1f2937; font-size: 1.125rem;">${dept.queue_count}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #f9fafb; border-radius: 0.5rem;">
+                        <span style="color: #6b7280; font-size: 0.875rem;">Avg. Wait Time</span>
+                        <strong style="color: #2563eb; font-size: 1.125rem;">${dept.avg_waiting_time} min</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 0.5rem; background: #f9fafb; border-radius: 0.5rem;">
+                        <span style="color: #6b7280; font-size: 0.875rem;">Service Time</span>
+                        <strong style="color: #6b7280; font-size: 1rem;">${dept.average_service_time} min</strong>
+                    </div>
+                </div>
+            `;
+
+                departmentGrid.appendChild(card);
+            });
+
+            // Update timestamp
+            const now = new Date();
+            document.getElementById('lastUpdate').textContent = now.toLocaleTimeString();
+
+        } catch (error) {
+            console.error('Error updating dashboard:', error);
+        }
+    }
+
+    // Initial load
+    updateDashboard();
+
+    // Auto-refresh every 5 seconds
+    setInterval(updateDashboard, 5000);
+</script>
+{% endblock %}
